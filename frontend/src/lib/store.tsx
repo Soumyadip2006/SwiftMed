@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { CATALOG, type Product } from "./catalog";
+import { consumeStock } from "./shop";
 
 export type CartItem = { productId: string; qty: number };
 
@@ -141,6 +142,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       createdAt: now,
       statusHistory: [{ status: "Order Received", at: now }],
     };
+    // Auto-reduce shop stock and raise a bill on the store side
+    const lines = o.items
+      .map((i) => {
+        const p = CATALOG.find((c) => c.id === i.productId);
+        return p ? { productId: p.id, name: p.name, pack: p.pack, qty: i.qty, price: p.price } : null;
+      })
+      .filter(Boolean) as { productId: string; name: string; pack: string; qty: number; price: number }[];
+    if (lines.length) {
+      consumeStock(lines, {
+        customerName: user?.name ?? "App customer",
+        customerPhone: o.contact,
+        source: "app",
+      });
+    }
     setOrders((prev) => [order, ...prev]);
     setCart([]);
     return order;
